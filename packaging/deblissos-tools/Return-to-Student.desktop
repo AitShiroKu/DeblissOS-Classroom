@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Return to Student Session
+Name[th]=กลับไปยังเซสชันนักเรียน
+Comment=Resume the existing student desktop
+Exec=/usr/bin/sudo /usr/sbin/deblissos-return-to-student
+Icon=system-switch-user
+Terminal=true
+Categories=System;
+StartupNotify=false

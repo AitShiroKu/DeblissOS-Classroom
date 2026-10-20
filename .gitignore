@@ -1,0 +1,8 @@
+/dist/
+/dist-repeat/
+/apt-repository/
+*.deb
+*.key
+*.pem
+**/private/
+**/secrets/

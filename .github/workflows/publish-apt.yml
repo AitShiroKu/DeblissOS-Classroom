@@ -1,0 +1,61 @@
+name: Publish signed APT repository
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pages
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: apt-public
+          path: public
+          persist-credentials: false
+      - name: Verify signing identity and repository metadata
+        env:
+          EXPECTED_FINGERPRINT: ${{ vars.APT_SIGNING_FINGERPRINT }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "$EXPECTED_FINGERPRINT" =~ ^[A-F0-9]{40}$ || "$EXPECTED_FINGERPRINT" =~ ^[A-F0-9]{64}$ ]]
+          export GNUPGHOME=$(mktemp -d)
+          chmod 700 "$GNUPGHOME"
+          gpg --batch --import public/deblissos-archive-keyring.gpg
+          actual=$(gpg --batch --with-colons --list-keys | awk -F: '$1 == "pub" {primary=1; next} primary && $1 == "fpr" {print $10; primary=0}')
+          [[ "$actual" == "$EXPECTED_FINGERPRINT" ]]
+          found=false
+          for suite in testing stable; do
+            if [[ -d "public/dists/$suite" ]]; then
+              found=true
+              gpgv --keyring "$PWD/public/deblissos-archive-keyring.gpg" --output "$RUNNER_TEMP/verified-release" "public/dists/$suite/InRelease"
+              cmp "$RUNNER_TEMP/verified-release" "public/dists/$suite/Release"
+              gpgv --keyring "$PWD/public/deblissos-archive-keyring.gpg" "public/dists/$suite/Release.gpg" "public/dists/$suite/Release"
+              mkdir -p "$RUNNER_TEMP/apt-$suite/lists/partial"
+              printf 'deb [signed-by=%s] file:%s %s main\n' "$PWD/public/deblissos-archive-keyring.gpg" "$PWD/public" "$suite" > "$RUNNER_TEMP/apt-$suite/sources.list"
+              apt-get -o "Dir::Etc::sourcelist=$RUNNER_TEMP/apt-$suite/sources.list" -o Dir::Etc::sourceparts=- -o "Dir::State::lists=$RUNNER_TEMP/apt-$suite/lists" -o "APT::Sandbox::User=$(id -un)" -o APT::Update::Error-Mode=any update
+            fi
+          done
+          [[ "$found" == true ]]
+          # Checkout metadata and GitHub automation do not belong in the public site.
+          rm -rf public/.git public/.github
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: public
+  deploy:
+    needs: verify
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Deploy verified repository
+        id: deployment
+        uses: actions/deploy-pages@v4
