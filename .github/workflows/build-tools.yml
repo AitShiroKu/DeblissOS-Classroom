@@ -1,0 +1,25 @@
+name: Build classroom tools
+on:
+  push:
+    paths: ["scripts/return-to-student-session.sh", "scripts/build-tools-deb.sh", "packaging/**", "docs/distro-updates.md", ".github/workflows/build-tools.yml"]
+  pull_request:
+    paths: ["scripts/return-to-student-session.sh", "scripts/build-tools-deb.sh", "packaging/**", "docs/distro-updates.md", ".github/workflows/build-tools.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build twice and compare
+        run: |
+          bash scripts/build-tools-deb.sh dist
+          bash scripts/build-tools-deb.sh dist-repeat
+          cmp dist/*.deb dist-repeat/*.deb
+          dpkg-deb --info dist/*.deb
+          dpkg-deb --contents dist/*.deb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: deblissos-tools
+          path: dist/*.deb

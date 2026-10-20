@@ -1,0 +1,9 @@
+Package: deblissos-tools
+Version: 0.1.0
+Section: admin
+Priority: optional
+Architecture: all
+Maintainer: DeblissOS Maintainers <deblissos@users.noreply.github.com>
+Depends: bash, systemd, sudo
+Description: Classroom administration tools for DeblissOS
+ Resume the existing student Plasma X11 session without creating a duplicate.
